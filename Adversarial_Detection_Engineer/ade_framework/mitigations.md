@@ -387,7 +387,7 @@ detection:
 
 ## Platform-Specific Mitigations
 
-The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIEM/EDR query language and rule model. Deep per-platform bug catalogs live under `bug_patterns/` — [`elasticsecurity.md`](../bug_patterns/elasticsecurity.md), [`microsoftsentinel.md`](../bug_patterns/microsoftsentinel.md), [`sigma.md`](../bug_patterns/sigma.md), [`splunk.md`](../bug_patterns/splunk.md). Summary of the highest-leverage mitigations per platform:
+The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIEM/EDR query language and rule model. Deep per-platform bug catalogs live under `bug_patterns/` — [`elasticsecurity.md`](../bug_patterns/elasticsecurity.md), [`microsoftsentinel.md`](../bug_patterns/microsoftsentinel.md), [`sigma.md`](../bug_patterns/sigma.md), [`splunk.md`](../bug_patterns/splunk.md), [`logscale.md`](../bug_patterns/logscale.md). Summary of the highest-leverage mitigations per platform:
 
 ### Elastic Security (TOML / KQL / EQL / ES|QL)
 
@@ -417,6 +417,16 @@ The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIE
 - **Windows:** replace `bin _time span=N` plus `count>N` with sliding/overlapping look-backs; a 1-minute bucket splits events 40 seconds apart, and a same-bucket correlation is defeated by delay alone.
 - **Extraction:** widen `rex` capture classes beyond `\w` (dots, hyphens, `@`) and surface extraction failure as its own signal rather than letting it silently zero the pipeline.
 - **Data models:** confirm acceleration and per-sourcetype CIM mapping before trusting a `tstats` detection's coverage, and read the `security_content_summariesonly` and `_filter` macros — their local definitions are part of the logic.
+
+### CrowdStrike Falcon LogScale (LQL)
+
+- **Case:** bare `=` is exact and case-sensitive and no forgiving position exists (unlike a Splunk base search) — put `/i` on every regex over attacker-supplied text and `ignoreCase=true` on every `in()`, reserving bare `=` for machine-cased values like `#event_simpleName`.
+- **Absent fields:** a comparison on a missing field always fails *except* `!=`, so every positive filter is silently also a presence test — assert `field = *` explicitly where the field is required, and monitor `field != *` volume so a dead extraction is distinguishable from an absence of attacks.
+- **Ladders:** `case`/`match` drop events no clause matches — end every ladder with a wildcard clause, keep the `"other"` bucket flowing, and alert on its volume.
+- **Aggregation limits:** set `limit=max` on any `groupBy()` feeding a threshold or rarity gate (the default 20,000-group cap retains top-N *by value*, so rare groups are evicted first), and never leave a group limit numerically near the alert threshold.
+- **Joins:** make the selective set the subquery (the default 100,000-row cap truncates silently), set `max=` above its default of 1, carry `aid` on both sides of the key (process IDs are sensor-scoped), and treat post-join filters on enriched fields as filters on possibly-foreign data; prefer `selfJoinFilter()` + `groupBy()` + `collect()` for same-stream correlation.
+- **Process coverage:** cover `SyntheticProcessRollup2` alongside `ProcessRollup2` unless new-execution-only is the documented intent.
+- **Scheduled sorts:** set `limit=` explicitly on `sort()`/`tail()` in anything scheduled — the default is 200 rows.
 
 ### Sigma (generic YAML, transpiled)
 

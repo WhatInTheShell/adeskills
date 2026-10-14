@@ -12,6 +12,7 @@ Detection-logic bugs specific to a SIEM/EDR query language and rule model — ru
 | [microsoftsentinel.md](microsoftsentinel.md) | Microsoft Sentinel (KQL): `queryPeriod`/`bin()` windows, `parse` on message strings, IOC/enum lists, per-entity & Top-N thresholds, ASIM semantics, KQL case/regex quirks, `join` null-handling |
 | [sigma.md](sigma.md) | Sigma (generic YAML): detection-block Boolean semantics, `logsource` binding, modifier blind spots, and the transpilation bug class (regex flavor, field mapping, null-handling) |
 | [splunk.md](splunk.md) | Splunk (SPL / ESCU): `search`-vs-`where` disagreement on case and on AND/OR precedence, `!=` dropping absent-field events, null by-fields vanishing from `stats`, `bin`/`span` straddling, `rex` class limits, CIM/`tstats` acceleration, macro indirection |
+| [logscale.md](logscale.md) | CrowdStrike Falcon LogScale (LQL): case-sensitive exact `=`, regex `/i` and `in()` case flags, absent-field comparisons failing except `!=`, `case`/`match` ladders dropping unlabeled events, `groupBy()`/`join()`/`sort()` limit saturation, `[aid, pid]` composite join keys, `ProcessRollup2` vs `SyntheticProcessRollup2` coverage |
 
 ## Telemetry & field semantics
 

@@ -4,7 +4,7 @@ title: "Gate Inversion — De Morgan's Laws in Detection Logic"
 ade_category: ADE4
 ade_subcategory: ADE4-01
 mitre_attack: N/A (logic flaw, not an attack technique)
-platform: Sigma / Splunk SPL / SIEM (platform-independent)
+platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / SIEM (platform-independent)
 testable: logic-analysis
 ---
 
@@ -175,6 +175,10 @@ Two SPL constructs invert a gate without the author writing an inversion.
 
 - **`field!="benign"` is a conjunction, not just a negation.** It expands to "field is not this value **and** the field exists", because `!=` excludes events with no value in the field ([docs](https://help.splunk.com/en/splunk-enterprise/search/search-manual/9.4/expressions-and-predicates/difference-between-and-not); replayed on 10.4.2). Suppressing the field therefore escapes the whole search rather than the exclusion — the gate the author built to *narrow* noise becomes a gate the attacker opens to *exit*. Written as `NOT (field="benign")` the inversion disappears. Full treatment in [absent-field-inverts-filter.md](../ADE4-04-field-mismapping-semantics/absent-field-inverts-filter.md).
 - **A negation's meaning depends on which command holds it.** `NOT`/`!=` inside a base `search` compares case-insensitively; the same predicate in a `| where` is case-sensitive, and the two commands bind AND/OR in opposite order. So an exclusion that correctly suppressed one benign value can, once relocated, suppress a whole disjunction branch or stop suppressing anything. See [AND-vs-OR confusion → Other platforms](../ADE4-03-incorrect-expression/and-vs-or-confusion.md) and [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #1–#3.
+
+## Other platforms — CrowdStrike LogScale (LQL)
+
+The implicit gate in LQL is the classification ladder. A `case` or `match` statement drops every event no clause matches — *"If no clauses match, then the events are dropped"* ([Conditional evaluation](https://library.humio.com/crowdstrike-query-language/syntax-conditional.html)) — so a ladder written to *label* events is also a gate that silently excludes whatever drifts outside its enumerated shapes: a new sensor version's field spelling, an unexpected value, a casing difference (LQL's `=` is case-sensitive). The author wrote a classifier; the engine runs a filter. The documented escape is a wildcard clause (`* => *`) — keep it, give the fall-through an explicit `"other"` label, and alert on its volume. A second, smaller inversion hides in positive filters: in LQL a comparison on an absent field always fails except `!=`, so every `=` selection carries an undeclared "and the field exists" conjunct — the mirror of Splunk's `!=` hazard above. *Doc-grounded, not replayed.* See [`bug_patterns/logscale.md`](../../../bug_patterns/logscale.md) #3–#4.
 
 ## Detection Layers
 

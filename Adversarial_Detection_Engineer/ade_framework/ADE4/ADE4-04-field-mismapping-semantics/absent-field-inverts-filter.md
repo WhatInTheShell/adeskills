@@ -4,7 +4,7 @@ title: "Absent Field Inverts a Filter Clause"
 ade_category: ADE4
 ade_subcategory: ADE4-04
 mitre_attack: N/A (logic/telemetry flaw, not an attack technique)
-platform: Sigma / Splunk SPL / SIEM (backend- and source-dependent)
+platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / SIEM (backend- and source-dependent)
 testable: logic-analysis
 ---
 
@@ -103,6 +103,12 @@ So `field!="benign"` is two filters, one of which nobody wrote. Where the source
 Two related forms worth knowing: wildcards do work with `!=` (`fld!="*temp.dat*"` excludes as expected), but the bare `fld!=*` **returns no events at all**, while `NOT fld=*` is the correct way to ask for "field is null or undefined". Transpiled Sigma gets this right — `pySigma-backend-splunk` compiles `field: null` to `NOT {field}=*` — so the bug is almost always introduced by hand-written or hand-tuned SPL.
 
 **Hardened form:** `| search NOT (parent_process_name="explorer.exe")`, plus an explicit `| where isnotnull(parent_process_name)` only where the field is genuinely required. Seen in *Clop Common Exec Parameter*. See [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #3.
+
+## Other platforms — CrowdStrike LogScale (LQL)
+
+LogScale is also deterministic, and it lands on the **opposite side** of Splunk: *"If a specified field is not present in an event, the comparison always fails unless it is `!=`"* ([Operators](https://library.humio.com/crowdstrike-query-language/syntax-operators.html)). So `FileName != "benign.exe"` **keeps** events with no `FileName` — the negation is the safe direction, with no undeclared presence test. The inversion moves to the *positive* side instead: every `=`, wildcard and numeric comparison silently also requires the field to exist, so a dead extraction or an unmapped source turns a selection clause into a drop-everything gate, and the rule reports quiet rather than broken. The same source rule therefore mis-breaks in *different directions* on the two platforms — Splunk's hand-written `!=` drops absent-field events, LogScale's `=` selections do — which is exactly the backend-dependence this file's Sigma section warns about, realized in two concrete engines. Presence is explicit in LQL when you want it: `field = *` asserts it, `field != *` selects its absence ([Field filters](https://library.humio.com/crowdstrike-query-language/syntax-filters.html)). *Doc-grounded, not replayed — there is no live LogScale tenant behind this file.*
+
+**Hardened form:** keep exclusions as `!=`, assert `field = *` explicitly where a positive filter genuinely depends on the field, and monitor `field != *` volume per feed so extraction failure surfaces as a signal. See [`bug_patterns/logscale.md`](../../../bug_patterns/logscale.md) #3.
 
 ## Detection Layers (auditing the rule, not an attack)
 

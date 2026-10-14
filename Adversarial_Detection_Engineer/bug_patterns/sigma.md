@@ -44,7 +44,7 @@ detection:
 
 A Sigma rule that reads correctly can **behave differently or fail to compile** per backend:
 
-1. **Regex flavor (`|re`).** Splunk = PCRE (lookaround OK); Elasticsearch = Lucene regex (no lookaround); Sentinel KQL, Google SecOps YARA-L, CrowdStrike LogScale = RE2 (no lookaround/backrefs). A `|re` using lookbehind silently fails to transpile or matches nothing on RE2 backends — a zero-coverage gap. See [logging_assumption_errors #5](logging_assumption_errors.md).
+1. **Regex flavor (`|re`).** Splunk = PCRE (lookaround OK); Elasticsearch = Lucene regex (no lookaround); Sentinel KQL, Google SecOps YARA-L = RE2 (no lookaround/backrefs); CrowdStrike LogScale = JitRex, documented only as *"very similar"* to Perl/JavaScript/re2 syntax ([Regex syntax](https://library.humio.com/crowdstrike-query-language/syntax-regex.html)), so verify lookaround per construct rather than assuming either answer. A `|re` using lookbehind silently fails to transpile or matches nothing on RE2 backends — a zero-coverage gap. See [logging_assumption_errors #5](logging_assumption_errors.md).
 2. **Field mapping.** The backend pipeline (pySigma processing pipeline) maps Sigma field names to concrete columns. An unmapped field can resolve to *nothing* rather than erroring — `CommandLine` → `Process Command Line` (4688), `process.command_line` (ECS), etc. See [ADE4-04 field mismatch](../ade_framework/ADE4/ADE4-04-field-mismapping-semantics/field-name-mismatch.md).
 3. **Case sensitivity.** Sigma is case-insensitive in spec, but the compiled query may be case-sensitive on the target store; a `contains` becomes a case-sensitive substring on some backends.
 4. **Null-handling in `not filter`.** `condition: selection and not filter` inverts differently across backends when `filter`'s field is absent (three-valued logic) — false negatives on one SIEM, false positives on another. See [ADE4-04 absent-field inversion](../ade_framework/ADE4/ADE4-04-field-mismapping-semantics/absent-field-inverts-filter.md).
@@ -62,6 +62,18 @@ Read from the backend source rather than inferred. The emitted SPL is a base `se
 - **Field quoting:** names outside `^[\w.]+$` are quoted; a CIM field reached through a data model still needs the right pipeline, or it resolves to nothing (ADE4-04).
 
 See [`splunk.md`](splunk.md) for the native-SPL catalog these notes point into.
+
+### Backend notes — LogScale (`fx2301/pySigma-backend-logscale` @ `dfa7f69`)
+
+Read from the backend source. Unlike the Splunk backend, this one is **community-maintained by a single author, not SigmaHQ or CrowdStrike** — zero stars, last commit 2023-12-12 — and the source still carries the pySigma cookiecutter's scaffolding comments (*"TODO: change the token definitions according to the syntax"*, a `FIXME` on the pipeline import). Treat its output as a draft to verify, not a supported conversion path.
+
+- **Sigma's case-insensitivity is silently lost.** `eq_token` is `=`, so every plain Sigma match compiles to LogScale's exact, case-sensitive `=` ([Operators](https://library.humio.com/crowdstrike-query-language/syntax-operators.html)) — the unfavorable mirror of the Splunk backend, where the base search preserved the spec's intent. Every converted rule whose value can vary in case needs a hand-added `/i` regex or `ignoreCase=true` rewrite.
+- **No field mapping exists.** `requires_pipeline` is `False` and no processing pipeline ships, so Sigma field names (`CommandLine`, `Image`, `TargetFilename`) pass through unmapped. Where that coincides with a Falcon field name it works by luck; everywhere else the compiled query filters a field that is never populated — and in LQL a comparison on an absent field always fails, so the rule returns nothing rather than erroring (ADE4-04).
+- **Several emitted tokens look like template defaults, not LQL.** The source emits `{field} startswith {value}`, a `casematch` expression family, `{field} is null`, and `exists({field})`/`notexists({field})` — none of which appears in the CQL filter or operator syntax documentation. A Sigma rule exercising those constructs (`startswith`/`endswith` modifiers, `field: null`, `|exists`) compiles to a query LogScale may refuse to parse. Wildcards, by contrast, survive correctly (`contains` → `field = "*value*"`, which is native LQL).
+- **Regex flags are prepended inline** (`re_flag_prefix = True` → `(?i)` inside the pattern) rather than LQL's documented trailing `/i` ([Regex flags](https://library.humio.com/crowdstrike-query-language/syntax-regex-flags.html)). Verify the inline form on your version before trusting a flagged `|re`.
+- **Operational consequence:** test-compile *and execute* every converted rule on a live view. A conversion that parses is not yet a conversion that matches — and one that fails to parse is at least loudly broken, which in this backend's state is the better failure mode.
+
+See [`logscale.md`](logscale.md) for the native-LQL catalog these notes point into.
 
 ## Field-name typos and normalization (ADE4-04)
 
