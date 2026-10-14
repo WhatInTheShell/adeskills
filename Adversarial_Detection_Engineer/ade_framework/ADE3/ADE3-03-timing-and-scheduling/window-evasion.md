@@ -6,7 +6,7 @@ ade_subcategory: ADE3-03
 mitre_attack:
   - T1110 (Brute Force)
   - T1114 (Email Collection)
-platform: Cross-platform
+platform: Cross-platform / Splunk SPL
 testable: logic-analysis
 ---
 
@@ -73,6 +73,22 @@ For sequence rules: widen `maxspan` to the realistic dwell time, or decouple the
 ### Why the hardened rule works
 
 A longer look-back with a sliding evaluation removes the "reset every 20 minutes" gap, and a corroborating signal (source-IP spread, impossible travel) catches distributed attempts that any single time bucket would miss. Widening or decoupling `maxspan` removes the trivial `sleep` bypass.
+
+## Other platforms — Splunk SPL
+
+`bin _time span=N` (and its `bucket` alias) assigns events to **wall-clock-aligned** buckets, not to a window relative to each event. Two events 40 seconds apart therefore land in different buckets. Replayed on Splunk Enterprise 10.4.2 with events at `10:00:50` and `10:01:30`:
+
+`| bin _time span=1m | stats count by _time` → two rows of `1`, never one row of `2`.
+
+Any `span` + `count > N` pair is evadable by straddling a boundary — N-1 events before the edge and N-1 after it never fill a bucket. Seen in *ESXi SSH Brute Force* (`span=5m`, `count > 10`), *Azure AD High Number Of Failed Authentications For User* (`span=10m`, `count > 20`), *O365 Multiple Mailboxes Accessed via API* (`bucket span=10m`, `unique_mailboxes > 5`).
+
+The sharper variant is a **same-bucket correlation**, where the window is not a threshold but a join condition. *Cisco IOS XE Guestshell Activation and Destroy* bins to `span=30m` and then requires both an activation `event_type` and a destruction `event_type` within that one bucket (`mvfind(event_types, ...)` on each side). Delay alone defeats it: activate, wait past the boundary, then destroy — and the pair is never observed together. Note also that the conjunction itself is an [ADE4-02](../../ADE4/ADE4-02-conjunction-inversion/README.md) exposure, since an attacker who activates guestshell and simply *leaves it running* satisfies neither half.
+
+**Hardened form:** use a sliding look-back rather than aligned buckets, and correlate on a stable key instead of a shared bucket —
+
+`| streamstats time_window=10m count as attempts by dest | where attempts > 10`
+
+See [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #6.
 
 ## Detection Layers
 

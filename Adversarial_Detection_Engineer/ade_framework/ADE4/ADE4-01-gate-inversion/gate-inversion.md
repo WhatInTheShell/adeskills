@@ -4,7 +4,7 @@ title: "Gate Inversion — De Morgan's Laws in Detection Logic"
 ade_category: ADE4
 ade_subcategory: ADE4-01
 mitre_attack: N/A (logic flaw, not an attack technique)
-platform: Sigma / SIEM (platform-independent)
+platform: Sigma / Splunk SPL / SIEM (platform-independent)
 testable: logic-analysis
 ---
 
@@ -168,6 +168,13 @@ python sigma_filter_check.py -r rules/windows/process_creation/suspicious_execut
 # Check all rules in a directory
 python sigma_filter_check.py -d rules/windows/
 ```
+
+## Other platforms — Splunk SPL
+
+Two SPL constructs invert a gate without the author writing an inversion.
+
+- **`field!="benign"` is a conjunction, not just a negation.** It expands to "field is not this value **and** the field exists", because `!=` excludes events with no value in the field ([docs](https://help.splunk.com/en/splunk-enterprise/search/search-manual/9.4/expressions-and-predicates/difference-between-and-not); replayed on 10.4.2). Suppressing the field therefore escapes the whole search rather than the exclusion — the gate the author built to *narrow* noise becomes a gate the attacker opens to *exit*. Written as `NOT (field="benign")` the inversion disappears. Full treatment in [absent-field-inverts-filter.md](../ADE4-04-field-mismapping-semantics/absent-field-inverts-filter.md).
+- **A negation's meaning depends on which command holds it.** `NOT`/`!=` inside a base `search` compares case-insensitively; the same predicate in a `| where` is case-sensitive, and the two commands bind AND/OR in opposite order. So an exclusion that correctly suppressed one benign value can, once relocated, suppress a whole disjunction branch or stop suppressing anything. See [AND-vs-OR confusion → Other platforms](../ADE4-03-incorrect-expression/and-vs-or-confusion.md) and [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #1–#3.
 
 ## Detection Layers
 

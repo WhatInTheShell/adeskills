@@ -6,7 +6,7 @@ description: >
   detection-logic-bug taxonomy to derive emulation variants that probe the rules' likely false
   negatives, and produces rule-hardening mitigation recommendations after testing.
   Trigger when scoping or replanning a purple-team engagement against named SIEM tools (Splunk,
-  Elastic, Sentinel, CrowdStrike, Sigma), building detection-validation emulation plans, or turning
+  Elastic, Sentinel, Splunk, CrowdStrike, Sigma), building detection-validation emulation plans, or turning
   detection-rule gaps into test cases and post-test fixes.
 tools:
   - kali_shell
@@ -188,5 +188,5 @@ Follow the tables with **Notes for the human operator**: judgment calls, anythin
 - **Telemetry ≠ rule text.** A rule can be perfectly written and still contribute zero coverage where its data source isn't collected. Always separate a *logic* miss (Phase 4 rule fix) from a *telemetry* miss (collection fix).
 - **Public rule ≠ deployed rule.** Vendors and clients tune/disable/replace rules. Treat public rules as the typical shape of coverage; confirm the client's deployed, tuned version, or record it as an open question.
 - **Cite everything.** Repo + rule name for every rule; "client-provided, <date>" for shared internal rules (keep their content in the engagement's access-controlled notes, not in this skill).
-- **Backend divergence is real.** The same Sigma rule behaves differently across Splunk/Elastic/Sentinel/CrowdStrike (regex flavor, field mapping, null-handling). Validate per specified backend, not once.
+- **Backend divergence is real.** The same Sigma rule behaves differently across Splunk/Elastic/Sentinel/CrowdStrike (regex flavor, field mapping, null-handling). Validate per specified backend, not once. On Splunk, divergence also occurs *within* one query: `search` and `where` disagree on case sensitivity and on AND/OR precedence, so note which command holds each predicate ([`bug_patterns/splunk.md`](../Adversarial_Detection_Engineer/bug_patterns/splunk.md)).
 - Deeper reference (taxonomy, worked technique files, logging nuances, ruleset search guidance) — pull at runtime per "Context enrichment": <https://github.com/Adversarial-Detection-Engineering/adeskills> → `Adversarial_Detection_Engineer/{ade_framework,bug_patterns,ade-checklist.md,rulesets.md}`.

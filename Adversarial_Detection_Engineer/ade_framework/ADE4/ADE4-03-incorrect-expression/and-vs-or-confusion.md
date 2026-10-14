@@ -4,7 +4,7 @@ title: "AND vs OR Confusion in Sigma Conditions"
 ade_category: ADE4
 ade_subcategory: ADE4-03
 mitre_attack: N/A (logic flaw, not an attack technique)
-platform: Sigma / SIEM (platform-independent)
+platform: Sigma / Splunk SPL / SIEM (platform-independent)
 testable: logic-analysis
 ---
 
@@ -259,6 +259,29 @@ The SigmaHQ project includes automated checks that catch some Boolean errors:
 | Redundant selections | Selections that are subsets of other selections |
 
 However, the pipeline struggles with **too-narrow** rules because determining whether a rule should be broader requires understanding the author's intent, which is not encoded in the YAML.
+
+## Other platforms — Splunk SPL
+
+Sigma's version of this bug is an authoring mistake: the YAML says AND where the author meant OR. SPL adds a second, nastier variant — **the same text means both things, depending on which command evaluates it.** The `search` command (and `tstats WHERE`) binds **OR tighter than AND**; `where`/eval binds **AND tighter than OR**.
+
+Replayed on Splunk Enterprise 10.4.2 against a single event holding `a="9", b="2", c="3"`:
+
+| Query | Parsed as | Result |
+|---|---|---|
+| `... \| search a="1" b="2" OR c="3"` | `a AND (b OR c)` | **0 results** |
+| `... \| where a="1" AND b="2" OR c="3"` | `(a AND b) OR c` | **1 result** |
+
+Identical Boolean text, inverted outcome. Three consequences for a rule audit:
+
+1. **Moving a clause changes the rule.** Lifting a filter out of the base search into a `| where` (a routine tuning action, and a routine optimization) silently regroups it. Neither the diff nor the rule's description shows that the logic changed.
+2. **Mixed Booleans in `tstats WHERE` are the common real-world instance.** *Clop Common Exec Parameter* reads `WHERE Processes.process_name != "*temp.dat*" Processes.process = "*runrun*" OR Processes.process = "*temp.dat*"` — the exclusion binds across the whole OR group, so the rule requires that a process whose command line contains `temp.dat` *not* be named `temp.dat`, which removes exactly the renamed-binary case the second clause enumerates.
+3. **Transpiled Sigma inherits the search-command precedence.** `pySigma-backend-splunk` emits a bare space for AND and `OR` for OR, so the compiled query relies on the favorable precedence; its `_has_top_level_or` guard stops the backend's own term-hoisting from breaking a disjunction, but nothing protects a human who edits the emitted SPL afterwards.
+
+**Hardened form:** parenthesize every mixed Boolean regardless of position, so the two precedences cannot disagree —
+
+`| search (Processes.process="*runrun*" OR Processes.process="*temp.dat*") NOT (Processes.process_name="*temp.dat*")`
+
+See [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #2 for the probe and #3 for why the exclusion is also better written as `NOT (...)` than `!=`.
 
 ## Detection Layers
 

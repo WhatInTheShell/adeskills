@@ -11,6 +11,7 @@ Detection-logic bugs specific to a SIEM/EDR query language and rule model — ru
 | [elasticsecurity.md](elasticsecurity.md) | Elastic Security (TOML / KQL / EQL / ES\|QL): rule-type exposures, `new_terms`/`threshold` keys, `maxspan`, `DATE_TRUNC` buckets, `process.name` vs `.executable`, extension lists, ML drift |
 | [microsoftsentinel.md](microsoftsentinel.md) | Microsoft Sentinel (KQL): `queryPeriod`/`bin()` windows, `parse` on message strings, IOC/enum lists, per-entity & Top-N thresholds, ASIM semantics, KQL case/regex quirks, `join` null-handling |
 | [sigma.md](sigma.md) | Sigma (generic YAML): detection-block Boolean semantics, `logsource` binding, modifier blind spots, and the transpilation bug class (regex flavor, field mapping, null-handling) |
+| [splunk.md](splunk.md) | Splunk (SPL / ESCU): `search`-vs-`where` disagreement on case and on AND/OR precedence, `!=` dropping absent-field events, null by-fields vanishing from `stats`, `bin`/`span` straddling, `rex` class limits, CIM/`tstats` acceleration, macro indirection |
 
 ## Telemetry & field semantics
 

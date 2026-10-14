@@ -51,6 +51,18 @@ A Sigma rule that reads correctly can **behave differently or fail to compile** 
 
 **Always inspect the transpiled query**, not just the Sigma source; a rule that fails to transpile is silent zero coverage.
 
+### Backend notes — Splunk (`pySigma-backend-splunk` @ `d036264`)
+
+Read from the backend source rather than inferred. The emitted SPL is a base `search`, which is the *favorable* position for three of the four hazards above — and that is exactly why editing it afterwards is dangerous.
+
+- **Null handling is correct, and better than hand-written SPL.** `field_null_expression` compiles Sigma's `field: null` to `NOT {field}=*`, which is the form that actually matches absent fields; the intuitive hand-written `field!=*` returns no events at all ([Difference between != and NOT](https://help.splunk.com/en/splunk-enterprise/search/search-manual/9.4/expressions-and-predicates/difference-between-and-not)). Any `not filter` you hand-translate into `!=` re-introduces the three-valued-logic bug the backend avoided.
+- **Precedence is carried, not normalized.** `and_token` is a bare space and `or_token` is `OR`, so the compiled condition inherits the search command's precedence (OR binds tighter than AND — the inverse of `where`/eval). The backend guards its own optimizations with a `_has_top_level_or` check so hoisting a term never pulls it out of a disjunction, but **a human who moves a clause from the base search into a `| where` silently flips the grouping.** Parenthesize before editing.
+- **Case survives only while the clause stays in the base search.** Sigma is case-insensitive by spec and a Splunk base search compares field values case-insensitively, so intent is preserved — but the same predicate relocated to `where`/`like()`/`match()` becomes case-sensitive, and `in_expressions_allow_wildcards` means a compiled `IN (...)` list changes case behavior with it.
+- **`|re` passes through verbatim** (`re_expression` is `{regex}`), and Splunk is PCRE, so lookaround does survive here — unlike the RE2 and Lucene backends in #1. A pattern with no `(?i)` is still case-sensitive.
+- **Field quoting:** names outside `^[\w.]+$` are quoted; a CIM field reached through a data model still needs the right pipeline, or it resolves to nothing (ADE4-04).
+
+See [`splunk.md`](splunk.md) for the native-SPL catalog these notes point into.
+
 ## Field-name typos and normalization (ADE4-04)
 
 Exact-spelling matters and fails silently: Sigma uses `TargetFilename` (lowercase `n`), `OriginalFileName`, `ParentImage`. `Commandline`/`command_line`/`TargetFileName` typos resolve to no column on case/spelling-sensitive backends. Prefer the taxonomy's canonical names and let the pipeline map them. Full catalog: [`sigma_field_semantics.md`](sigma_field_semantics.md).

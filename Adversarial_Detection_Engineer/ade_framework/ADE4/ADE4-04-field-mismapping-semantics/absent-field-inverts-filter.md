@@ -4,7 +4,7 @@ title: "Absent Field Inverts a Filter Clause"
 ade_category: ADE4
 ade_subcategory: ADE4-04
 mitre_attack: N/A (logic/telemetry flaw, not an attack technique)
-platform: Sigma / SIEM (backend- and source-dependent)
+platform: Sigma / Splunk SPL / SIEM (backend- and source-dependent)
 testable: logic-analysis
 ---
 
@@ -84,6 +84,25 @@ Now the exclusion applies only when `ParentImage` is present *and* equals the be
 2. Pin `logsource.service` so the field's availability is known, not assumed.
 3. Inspect the **transpiled** query's null-handling on each target backend — do not trust that `not filter` means what it reads.
 4. Prefer excluding on stable, always-present fields (event ID, product-guaranteed fields) over optional ones.
+
+## Other platforms — Splunk SPL
+
+On Splunk the inversion is not backend-ambiguous, it is **documented and deterministic**, which makes it easy to audit and easy to get wrong. The two ways to write "not this value" differ precisely on the absent-field case:
+
+> With `!=`, *"every event that has a value in the field, where that value does not match the value you specify, is returned. Events that do not have a value in the field are not included in the results."* With `NOT`, *"every event is returned except the events that contain the value you specify. This includes events that do not have a value in the field."* — [Difference between != and NOT](https://help.splunk.com/en/splunk-enterprise/search/search-manual/9.4/expressions-and-predicates/difference-between-and-not)
+
+Replayed on Splunk Enterprise 10.4.2 with event A holding `fld="y"` and event B carrying no `fld` at all:
+
+| Query | Keeps | Effect |
+|---|---|---|
+| `\| search fld!="x"` | A only | B is **silently dropped** — the exclusion became "…and the field must exist" |
+| `\| search NOT fld="x"` | A and B | the author's actual intent |
+
+So `field!="benign"` is two filters, one of which nobody wrote. Where the sourcetype, CIM mapping or sensor configuration leaves that field unpopulated, the whole event leaves the pipeline — a false negative on every event the exclusion was never meant to touch. An attacker who can suppress the field (an execution path that emits no parent context, a source whose add-on does not map it) escapes the *search*, not merely the exclusion.
+
+Two related forms worth knowing: wildcards do work with `!=` (`fld!="*temp.dat*"` excludes as expected), but the bare `fld!=*` **returns no events at all**, while `NOT fld=*` is the correct way to ask for "field is null or undefined". Transpiled Sigma gets this right — `pySigma-backend-splunk` compiles `field: null` to `NOT {field}=*` — so the bug is almost always introduced by hand-written or hand-tuned SPL.
+
+**Hardened form:** `| search NOT (parent_process_name="explorer.exe")`, plus an explicit `| where isnotnull(parent_process_name)` only where the field is genuinely required. Seen in *Clop Common Exec Parameter*. See [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #3.
 
 ## Detection Layers (auditing the rule, not an attack)
 

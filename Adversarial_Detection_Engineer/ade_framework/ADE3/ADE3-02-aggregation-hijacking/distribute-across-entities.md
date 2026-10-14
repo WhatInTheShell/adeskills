@@ -6,7 +6,7 @@ ade_subcategory: ADE3-02
 mitre_attack:
   - T1110.003 (Brute Force: Password Spraying)
   - T1078 (Valid Accounts)
-platform: Cloud / Identity
+platform: Cloud / Identity / Splunk SPL
 testable: logic-analysis
 ---
 
@@ -70,6 +70,20 @@ FROM logs-aws.bedrock*
 ```
 
 Add an **account-level (or tenant-level) aggregation and a distinct-entity cardinality clause**, so a campaign spread thinly across many users still trips a coarser bucket; for Top-N rules, alert on absolute volume/behaviour thresholds rather than relative ranking.
+
+## Other platforms — Splunk SPL
+
+In SPL the grouping key is the `by` clause, and it carries two distinct exposures.
+
+**The key the attacker chooses.** `| stats count by user, src_ip | where count > 10` counts per *(user, src_ip)* pair, so distributing over either field keeps every bucket under the threshold while the aggregate sits far above it. The rule catches the brute force it is named for and misses the spray. Seen in *ESXi SSH Brute Force* (`by user, src_ip, dest`, `count > 10`), *Azure AD High Number Of Failed Authentications For User* (`by user`, `count > 20`), and *O365 Multiple Mailboxes Accessed via API*, where the key includes `ClientInfoString` — a client-supplied string — so varying it per mailbox holds `dc(user)` at 1 against a `> 5` threshold.
+
+**The key that disappears.** An event whose by-field is null does not appear in `stats` output at all: two events where only one carries the field produce a single row, and `fillnull` restores the second (replayed on Splunk Enterprise 10.4.2). So anything that nulls the by-field removes the event from the count rather than registering it — including an upstream `rex` whose capture class cannot match the real value. *ESXi SSH Brute Force* extracts the username with `(?<user>[\w]+)`, and `\w` excludes `.`, `-` and `@`, so a spray against `first.last` or `root@host` accounts extracts nothing and is counted nowhere.
+
+**Hardened form:** key on the target and count the distinct attacker surface, and make extraction failure visible rather than silent —
+
+`| fillnull value="EXTRACTION_FAILED" user | bin _time span=5m | stats dc(user) as users dc(src_ip) as sources count as attempts by dest | where attempts > 10 OR users > 5 OR sources > 5`
+
+See [`bug_patterns/splunk.md`](../../../bug_patterns/splunk.md) #4, #5 and #7.
 
 ## Detection Layers
 

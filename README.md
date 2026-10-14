@@ -4,7 +4,7 @@
 
 A working knowledge base for **Adversarial Detection Engineering (ADE)**: reasoning about the **false negatives** in SIEM/EDR/XDR detection rules — the mismatches between what a rule *intends* to catch and what it *actually* catches — before a threat actor abuses them.
 
-It packages the ADE taxonomy as worked technique files, platform-specific bug-pattern references, pre-engagement scoping tooling, and a Redamon skill, all grounded in analysis of real public detection rulesets (Sigma, Elastic Security, Microsoft Sentinel).
+It packages the ADE taxonomy as worked technique files, platform-specific bug-pattern references, pre-engagement scoping tooling, and a Redamon skill, all grounded in analysis of real public detection rulesets (Sigma, Elastic Security, Microsoft Sentinel, Splunk ESCU, CrowdStrike LogScale).
 
 > **Defensive use only.** This material is for detection engineering, purple-team scoping, and risk assessment. Obtain explicit written authorization before testing detections or systems you do not own or operate. See each technique's own guardrails.
 
@@ -65,9 +65,9 @@ redamon/                            Redamon-packaged skill (ade_scoper) + README
 | Triage a rule quickly | [bug-likelihood-test.md](Adversarial_Detection_Engineer/ade_framework/bug-likelihood-test.md) · [ade-checklist.md](Adversarial_Detection_Engineer/ade-checklist.md) |
 | See worked technique files | the `ADEn-NN-*/` folders under [ade_framework](Adversarial_Detection_Engineer/ade_framework/) |
 | Fix a vulnerable rule | [mitigations.md](Adversarial_Detection_Engineer/ade_framework/mitigations.md) (incl. per-platform sections) |
-| Platform-specific pitfalls | [bug_patterns/](Adversarial_Detection_Engineer/bug_patterns/) — [Elastic](Adversarial_Detection_Engineer/bug_patterns/elasticsecurity.md) · [Sentinel](Adversarial_Detection_Engineer/bug_patterns/microsoftsentinel.md) · [Sigma](Adversarial_Detection_Engineer/bug_patterns/sigma.md) |
+| Platform-specific pitfalls | [bug_patterns/](Adversarial_Detection_Engineer/bug_patterns/) — [Elastic](Adversarial_Detection_Engineer/bug_patterns/elasticsecurity.md) · [Sentinel](Adversarial_Detection_Engineer/bug_patterns/microsoftsentinel.md) · [Sigma](Adversarial_Detection_Engineer/bug_patterns/sigma.md) · [Splunk](Adversarial_Detection_Engineer/bug_patterns/splunk.md) |
 | Scope a purple-team engagement | [rulesets.md](Adversarial_Detection_Engineer/rulesets.md) · [redamon/ade_scoper.md](redamon/ade_scoper.md) |
-| Browse the raw findings catalog | [total_candidate_bugs.md](total_candidate_bugs.md) — 605 candidate bypass findings across Elastic/Sentinel/Crowdstrike/Sigma |
+| Browse the raw findings catalog | [total_candidate_bugs.md](total_candidate_bugs.md) — 619 candidate bypass findings across Elastic/Sentinel/Splunk/CrowdStrike/Sigma |
 
 ## How a technique file is structured
 

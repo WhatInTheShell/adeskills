@@ -387,7 +387,7 @@ detection:
 
 ## Platform-Specific Mitigations
 
-The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIEM/EDR query language and rule model. Deep per-platform bug catalogs live under `bug_patterns/` — [`elasticsecurity.md`](../bug_patterns/elasticsecurity.md), [`microsoftsentinel.md`](../bug_patterns/microsoftsentinel.md), [`sigma.md`](../bug_patterns/sigma.md). Summary of the highest-leverage mitigations per platform:
+The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIEM/EDR query language and rule model. Deep per-platform bug catalogs live under `bug_patterns/` — [`elasticsecurity.md`](../bug_patterns/elasticsecurity.md), [`microsoftsentinel.md`](../bug_patterns/microsoftsentinel.md), [`sigma.md`](../bug_patterns/sigma.md), [`splunk.md`](../bug_patterns/splunk.md). Summary of the highest-leverage mitigations per platform:
 
 ### Elastic Security (TOML / KQL / EQL / ES|QL)
 
@@ -407,6 +407,16 @@ The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIE
 - **Destinations:** match the risky *behavior shape* (delete/mark-read/move + sensitive keyword) instead of a fixed folder/site allow-list.
 - **Case sensitivity:** use `=~`/`in~`/`has_cs` deliberately — `==`/`has`/`in` are case-sensitive and silently miss variants.
 - **ASIM:** audit `where field != value` exclusions for scoped blind spots (e.g. excluding `NonInteractive` accounts).
+
+### Splunk (SPL / ESCU)
+
+- **Position matters:** `search` compares field values case-insensitively, `where`/`like()`/`match()` case-sensitively, and the two bind AND/OR in opposite order. Parenthesize every mixed Boolean and fold case (`lower()`, `(?i)`) on anything attacker-supplied.
+- **Exclusions:** write `NOT (field="value")`, not `field!="value"` — `!=` additionally requires the field to exist, so an unpopulated field drops the whole event instead of just the benign one.
+- **Aggregation:** `fillnull` before `stats ... by` on optional fields (a null by-field vanishes from the results), and alert on the filled bucket.
+- **Thresholds:** key on the target and count the distinct attacker surface (`dc(user)`, `dc(src_ip)`) instead of counting per attacker-chosen `by` value.
+- **Windows:** replace `bin _time span=N` plus `count>N` with sliding/overlapping look-backs; a 1-minute bucket splits events 40 seconds apart, and a same-bucket correlation is defeated by delay alone.
+- **Extraction:** widen `rex` capture classes beyond `\w` (dots, hyphens, `@`) and surface extraction failure as its own signal rather than letting it silently zero the pipeline.
+- **Data models:** confirm acceleration and per-sourcetype CIM mapping before trusting a `tstats` detection's coverage, and read the `security_content_summariesonly` and `_filter` macros — their local definitions are part of the logic.
 
 ### Sigma (generic YAML, transpiled)
 
