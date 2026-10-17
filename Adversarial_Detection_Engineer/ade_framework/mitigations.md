@@ -428,6 +428,17 @@ The ADE categories are platform-agnostic, but the *concrete* fixes differ by SIE
 - **Process coverage:** cover `SyntheticProcessRollup2` alongside `ProcessRollup2` unless new-execution-only is the documented intent.
 - **Scheduled sorts:** set `limit=` explicitly on `sort()`/`tail()` in anything scheduled — the default is 200 rows.
 
+### Sumo Logic (Log Search pipelines / Cloud SIEM rules)
+
+- **Extraction is a filter:** a `parse`/`extract`/`json` stage without `nodrop` discards every message that does not match, before the detection logic runs — default to `nodrop` everywhere and make field requirements explicit downstream with `where !isNull(field)`. `csv`, `split`, `parseDate` and `parseHex` cannot carry `nodrop` at all.
+- **Case:** keyword expressions and metadata tags are case-insensitive, but `=`, `!=`, `matches`, `like` and `contains` are case-sensitive — normalize with `toLowerCase()` before comparing, and read every severity or category ladder for mixed casing conventions, where the arms in the losing convention are dead code.
+- **Keyword scope:** keyword wildcards match whole terms, never partial terms, and a negated bare keyword excludes on the whole raw message rather than on a field — put real selection in typed `where` clauses over parsed fields.
+- **Regex flavor:** `matches` is RE2, `rlike` is a Java regular expression, `like` is SQL-style `_`/`%` — record which engine each pattern targets and re-verify instead of re-pasting; explicit `json` key references are case-sensitive (`json auto` is not).
+- **Absent fields (Cloud SIEM):** every comparison against null returns false, so positive filters are silently presence tests — assert `!isNull(field)` where required. The behavior of `!=` on an absent field is **not documented**: test it on your own tenant and, until then, write exclusions as `isNull(field) || field != "value"`.
+- **Schema, not logs:** rules see normalized fields only — confirm this tenant's log mapping populates every field a rule names, reach unmapped fields via `fields['name']`, and monitor per-field record volume so a mapping regression shows up as a drop.
+- **The alert contract:** a signal is not an alert. The activity score must *exceed* 12 within a 14-day window while per-signal severity caps at 10, so no single signal can alert alone, and redundant signals for a signal-entity pair are suppressed for 72 hours — build escalation from *distinct* signals, use a custom insight for anything that must alert standalone, and treat severity assignment as reviewable logic.
+- **Ceilings and estimates:** set `limit` explicitly on anything scheduled (max 10,000); never gate a tuned threshold on `count_distinct` where the distinct count can exceed 100 (approximate, ±2/4/6% bands, wrong in either direction); treat `count_frequent` as unusable for rarity work — it retains the highest-count 10,000 and over-estimates by design.
+
 ### Sigma (generic YAML, transpiled)
 
 - **Boolean intent:** remember list-under-key = OR, separate keys = AND; use `1 of selection_*` / explicit `condition`, and never AND together alternatives.

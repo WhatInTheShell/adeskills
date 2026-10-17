@@ -4,7 +4,7 @@ title: "Absent Field Inverts a Filter Clause"
 ade_category: ADE4
 ade_subcategory: ADE4-04
 mitre_attack: N/A (logic/telemetry flaw, not an attack technique)
-platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / SIEM (backend- and source-dependent)
+platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / Sumo Logic Cloud SIEM / SIEM (backend- and source-dependent)
 testable: logic-analysis
 ---
 
@@ -109,6 +109,12 @@ Two related forms worth knowing: wildcards do work with `!=` (`fld!="*temp.dat*"
 LogScale is also deterministic, and it lands on the **opposite side** of Splunk: *"If a specified field is not present in an event, the comparison always fails unless it is `!=`"* ([Operators](https://library.humio.com/crowdstrike-query-language/syntax-operators.html)). So `FileName != "benign.exe"` **keeps** events with no `FileName` — the negation is the safe direction, with no undeclared presence test. The inversion moves to the *positive* side instead: every `=`, wildcard and numeric comparison silently also requires the field to exist, so a dead extraction or an unmapped source turns a selection clause into a drop-everything gate, and the rule reports quiet rather than broken. The same source rule therefore mis-breaks in *different directions* on the two platforms — Splunk's hand-written `!=` drops absent-field events, LogScale's `=` selections do — which is exactly the backend-dependence this file's Sigma section warns about, realized in two concrete engines. Presence is explicit in LQL when you want it: `field = *` asserts it, `field != *` selects its absence ([Field filters](https://library.humio.com/crowdstrike-query-language/syntax-filters.html)). *Doc-grounded, not replayed — there is no live LogScale tenant behind this file.*
 
 **Hardened form:** keep exclusions as `!=`, assert `field = *` explicitly where a positive filter genuinely depends on the field, and monitor `field != *` volume per feed so extraction failure surfaces as a signal. See [`bug_patterns/logscale.md`](../../../bug_patterns/logscale.md) #3.
+
+## Other platforms — Sumo Logic (Cloud SIEM rule expressions)
+
+Sumo Logic supplies the third answer, and it is the uncomfortable one: **the question is not documented.** The positive side is settled and matches LogScale — the rule language's `=` returns *"false if either expression is null"*, and the reference's worked examples run the same way throughout (`null = "foo"`, `null < 10`, `10 > null`, `null >= 10` and `null IN (...)` all return false), so every positive filter is silently also a presence test ([Cloud SIEM Rules Syntax](https://www.sumologic.com/help/docs/cse/rules/cse-rules-syntax/)). But `!=` on an absent field — the exact operator Splunk and LogScale both document, in opposite directions — is stated nowhere. The inference "null collapses to false, so `!=` is false too" is *not* safe here, because the same reference shows the product does not collapse null uniformly: `like` propagates it instead, where *"If `pattern` or `escape_character` is null, the expression evaluates to null"*. An exclusion clause on this platform therefore has an unknown treatment of absence until someone tests it on a tenant, and the two neighbouring platforms prove both answers are plausible implementations. Separately, absence has a second cause unique to Cloud SIEM: rules read **normalized** records, so a field this tenant's log mapping never populated is absent no matter what the raw log contained. *Doc-grounded, not replayed, and partly a documentation gap — there is no live Sumo Logic tenant behind this file.*
+
+**Hardened form:** write the intent explicitly rather than inheriting a default — `isNull(field) || field != "benign.exe"` to keep absent-field records, `!isNull(field) && field != "benign.exe"` to require the field — and assert `!isNull(field)` wherever a positive filter genuinely depends on one. Confirm the mapping populates the field for *this* source before trusting either form. See [`bug_patterns/sumologic.md`](../../../bug_patterns/sumologic.md) #5 and #6.
 
 ## Detection Layers (auditing the rule, not an attack)
 

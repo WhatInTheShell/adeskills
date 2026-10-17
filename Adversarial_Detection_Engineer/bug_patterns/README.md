@@ -13,6 +13,7 @@ Detection-logic bugs specific to a SIEM/EDR query language and rule model — ru
 | [sigma.md](sigma.md) | Sigma (generic YAML): detection-block Boolean semantics, `logsource` binding, modifier blind spots, and the transpilation bug class (regex flavor, field mapping, null-handling) |
 | [splunk.md](splunk.md) | Splunk (SPL / ESCU): `search`-vs-`where` disagreement on case and on AND/OR precedence, `!=` dropping absent-field events, null by-fields vanishing from `stats`, `bin`/`span` straddling, `rex` class limits, CIM/`tstats` acceleration, macro indirection |
 | [logscale.md](logscale.md) | CrowdStrike Falcon LogScale (LQL): case-sensitive exact `=`, regex `/i` and `in()` case flags, absent-field comparisons failing except `!=`, `case`/`match` ladders dropping unlabeled events, `groupBy()`/`join()`/`sort()` limit saturation, `[aid, pid]` composite join keys, `ProcessRollup2` vs `SyntheticProcessRollup2` coverage |
+| [sumologic.md](sumologic.md) | Sumo Logic (Log Search pipelines / Cloud SIEM rules): `parse` without `nodrop` discarding messages outright, keyword-vs-field case asymmetry, whole-term keyword wildcards, three regex flavors, null comparisons returning false with `!=` undocumented, normalized-schema mapping gaps, the signal-to-insight activity-score threshold and 72-hour signal suppression, `limit`/`count_frequent`/`count_distinct` ceilings and estimates |
 
 ## Telemetry & field semantics
 

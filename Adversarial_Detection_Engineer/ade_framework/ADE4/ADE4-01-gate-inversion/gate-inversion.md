@@ -4,7 +4,7 @@ title: "Gate Inversion — De Morgan's Laws in Detection Logic"
 ade_category: ADE4
 ade_subcategory: ADE4-01
 mitre_attack: N/A (logic flaw, not an attack technique)
-platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / SIEM (platform-independent)
+platform: Sigma / Splunk SPL / CrowdStrike LogScale (LQL) / Sumo Logic / SIEM (platform-independent)
 testable: logic-analysis
 ---
 
@@ -179,6 +179,10 @@ Two SPL constructs invert a gate without the author writing an inversion.
 ## Other platforms — CrowdStrike LogScale (LQL)
 
 The implicit gate in LQL is the classification ladder. A `case` or `match` statement drops every event no clause matches — *"If no clauses match, then the events are dropped"* ([Conditional evaluation](https://library.humio.com/crowdstrike-query-language/syntax-conditional.html)) — so a ladder written to *label* events is also a gate that silently excludes whatever drifts outside its enumerated shapes: a new sensor version's field spelling, an unexpected value, a casing difference (LQL's `=` is case-sensitive). The author wrote a classifier; the engine runs a filter. The documented escape is a wildcard clause (`* => *`) — keep it, give the fall-through an explicit `"other"` label, and alert on its volume. A second, smaller inversion hides in positive filters: in LQL a comparison on an absent field always fails except `!=`, so every `=` selection carries an undeclared "and the field exists" conjunct — the mirror of Splunk's `!=` hazard above. *Doc-grounded, not replayed.* See [`bug_patterns/logscale.md`](../../../bug_patterns/logscale.md) #3–#4.
+
+## Other platforms — Sumo Logic (Log Search pipelines)
+
+Sumo Logic moves the implicit gate **upstream of the detection logic entirely**, which makes it the hardest of the three to see in review: the gate is the field-extraction stage. *"For all parse operators, messages must match at least one segment of the parse expression or they are dropped from the results"* ([parse nodrop option](https://www.sumologic.com/help/docs/search/search-query-language/parse-operators/parse-nodrop-option/)). Where LogScale's ladder drops events it cannot *label* and Splunk's `!=` drops events missing a field, a bare `parse` in Sumo Logic drops events it cannot *read* — before any `where` clause in the query is evaluated. Nothing in the detection half of the pipeline reveals it; the rule simply returns fewer rows, with no error and no null-valued field to notice. The documented escape is `nodrop` on the stage, and it is well known to practitioners — in the public app corpus 1,148 of 1,190 extraction stages carry it. The finding is the residue: *Suspicious Traffic: GeoLocation Lookup Mismatch* (Fortinet) carries `nodrop` on 39 of its 41 `parse` stages and omits it on exactly two, one of which (`srcip`) is only a grouping key and not an input to the rule's mismatch test — so the omission narrows the detection on a field its own claim does not need. Note too that `csv`, `split`, `parseDate` and `parseHex` cannot take `nodrop` at all, so those stages are unconditional gates. *Doc-grounded, not replayed; corpus claims confirmed by reading the query source.* See [`bug_patterns/sumologic.md`](../../../bug_patterns/sumologic.md) #1.
 
 ## Detection Layers
 
